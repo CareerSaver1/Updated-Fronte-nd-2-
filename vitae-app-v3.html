@@ -1,0 +1,1360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Vitae — Job Application Tracker</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.development.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.development.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+html,body,#root{height:100%;background:#e8e4f8;font-family:'Inter',sans-serif;-webkit-font-smoothing:antialiased;}
+::-webkit-scrollbar{display:none;}
+*{scrollbar-width:none;-ms-overflow-style:none;}
+input,button,textarea{font-family:'Inter',sans-serif;}
+button{cursor:pointer;}
+.press:active{transform:scale(0.96);transition:transform 0.1s;}
+.slide-in{animation:slideIn 0.22s cubic-bezier(.25,.46,.45,.94) both;}
+@keyframes slideIn{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:translateY(0);}}
+.fade-in{animation:fadeIn 0.2s ease both;}
+@keyframes fadeIn{from{opacity:0;}to{opacity:1;}}
+.sheet-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:200;display:flex;align-items:flex-end;justify-content:center;}
+.sheet{background:#fff;border-radius:24px 24px 0 0;width:100%;max-width:430px;padding:0 0 32px;animation:sheetUp 0.25s cubic-bezier(.25,.46,.45,.94);}
+@keyframes sheetUp{from{transform:translateY(100%);}to{transform:translateY(0);}}
+.notif-panel{background:#fff;border-radius:0 0 24px 24px;width:100%;max-width:430px;animation:panelDown 0.22s cubic-bezier(.25,.46,.45,.94);}
+@keyframes panelDown{from{transform:translateY(-20px);opacity:0;}to{transform:translateY(0);opacity:1;}}
+.scroll-area{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+.pill{display:inline-flex;align-items:center;justify-content:center;border-radius:99px;font-weight:700;}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useCallback,useRef,useEffect,useMemo}=React;
+
+/* ══════════════════════════════════════════
+   DESIGN TOKENS
+══════════════════════════════════════════ */
+const P='#7c3aed',PL='#ede9fe',PD='#5b21b6',BG='#f5f5f7',
+      W='#fff',G1='#111827',G2='#374151',G3='#6b7280',
+      G4='#9ca3af',G5='#e5e7eb',G6='#f3f4f6';
+
+/* ══════════════════════════════════════════
+   MASTER DATA
+══════════════════════════════════════════ */
+const STUDY_LEVELS=[
+  {key:'sixth_form',   label:'Sixth Form',    emoji:'📖', desc:'A-Levels / IB / Pre-University'},
+  {key:'undergrad',    label:'Undergraduate', emoji:'🎓', desc:'BSc / BA / BEng / MEng (Year 1–4)'},
+  {key:'postgrad',     label:'Postgraduate',  emoji:'📚', desc:'MSc / MA / MBA / MRes'},
+  {key:'phd',          label:'PhD',           emoji:'🔬', desc:'Doctoral Research Programme'},
+  {key:'postdoc',      label:'Post-Doc',      emoji:'🏛️', desc:'Post-Doctoral Research Fellowship'},
+];
+
+const SECTORS=['Finance','Technology','Healthcare & Life Sciences','Consulting','Law',
+  'Engineering','Marketing','Education','Media','Retail','Sustainability',
+  'Public Sector','Logistics','Defence','Sports & Leisure'];
+
+const OPPORTUNITIES=[
+  /* ── Finance / Quant ─────────────────────────────────────── */
+  {id:1, title:'Quantitative Research Analyst Intern',           company:'Citadel',              location:'London, UK',       type:'Internship', deadline:'Mar 28, 2026', sector:'Finance',                  role:'Research'},
+  {id:2, title:'Quantitative Research Data Strategies Group',    company:'Citadel',              location:'London, UK',       type:'Internship', deadline:'Apr 1, 2026',  sector:'Finance',                  role:'Research'},
+  /* ── Life Sciences – Regulatory Affairs ──────────────────── */
+  {id:3, title:'Regulatory Affairs Graduate Programme',          company:'Takeda',               location:'London, UK',       type:'Graduate',   deadline:'Apr 5, 2026',  sector:'Healthcare & Life Sciences', role:'Regulatory Affairs'},
+  {id:4, title:'Regulatory Affairs Intern – EU Submissions',     company:'Johnson & Johnson',    location:'High Wycombe, UK', type:'Internship', deadline:'Apr 8, 2026',  sector:'Healthcare & Life Sciences', role:'Regulatory Affairs'},
+  {id:5, title:'Global Regulatory Affairs Associate',            company:'AbbVie',               location:'Maidenhead, UK',   type:'Graduate',   deadline:'Apr 12, 2026', sector:'Healthcare & Life Sciences', role:'Regulatory Affairs'},
+  {id:6, title:'Regulatory Affairs & Compliance Placement',      company:'Veeva Systems',        location:'Remote / London',  type:'Placement',  deadline:'Apr 18, 2026', sector:'Healthcare & Life Sciences', role:'Regulatory Affairs'},
+  /* ── Life Sciences – Medical Affairs ─────────────────────── */
+  {id:7, title:'Medical Affairs Summer Intern',                  company:'Amgen',                location:'Cambridge, UK',    type:'Internship', deadline:'Apr 22, 2026', sector:'Healthcare & Life Sciences', role:'Medical Affairs'},
+  {id:8, title:'Medical Affairs & MSL Graduate Scheme',          company:'Pfizer',               location:'Sandwich, UK',     type:'Graduate',   deadline:'Apr 25, 2026', sector:'Healthcare & Life Sciences', role:'Medical Affairs'},
+  {id:9, title:'Medical Science Liaison – Oncology Intern',      company:'Roche',                location:'Welwyn, UK',       type:'Internship', deadline:'Apr 28, 2026', sector:'Healthcare & Life Sciences', role:'Medical Affairs'},
+  /* ── Life Sciences – Quality Assurance ───────────────────── */
+  {id:10,title:'Quality Assurance Intern – Biologics',           company:'Amgen',                location:'Uxbridge, UK',     type:'Internship', deadline:'May 2, 2026',  sector:'Healthcare & Life Sciences', role:'Quality Assurance'},
+  {id:11,title:'QA & GMP Compliance Graduate Placement',         company:'AstraZeneca',          location:'Cambridge, UK',    type:'Placement',  deadline:'May 5, 2026',  sector:'Healthcare & Life Sciences', role:'Quality Assurance'},
+  {id:12,title:'Quality Systems & Audit Intern',                 company:'Johnson & Johnson',    location:'Wokingham, UK',    type:'Internship', deadline:'May 8, 2026',  sector:'Healthcare & Life Sciences', role:'Quality Assurance'},
+  {id:13,title:'QA Specialist – Pharmaceuticals Graduate',       company:'Takeda',               location:'London, UK',       type:'Graduate',   deadline:'May 10, 2026', sector:'Healthcare & Life Sciences', role:'Quality Assurance'},
+  /* ── Life Sciences – Market Access ───────────────────────── */
+  {id:14,title:'Market Access & HEOR Intern',                    company:'AbbVie',               location:'Maidenhead, UK',   type:'Internship', deadline:'May 12, 2026', sector:'Healthcare & Life Sciences', role:'Market Access'},
+  {id:15,title:'Pricing & Reimbursement Graduate Programme',     company:'Novartis',             location:'Farnborough, UK',  type:'Graduate',   deadline:'May 15, 2026', sector:'Healthcare & Life Sciences', role:'Market Access'},
+  {id:16,title:'Market Access Strategy Placement',               company:'Veeva Systems',        location:'Remote / UK',      type:'Placement',  deadline:'May 18, 2026', sector:'Healthcare & Life Sciences', role:'Market Access'},
+  /* ── Life Sciences – Clinical / R&D ──────────────────────── */
+  {id:17,title:'Clinical Research Operations Intern',            company:'Pfizer',               location:'Sandwich, UK',     type:'Internship', deadline:'May 20, 2026', sector:'Healthcare & Life Sciences', role:'Clinical Research'},
+  {id:18,title:'R&D Data Science Graduate Programme',            company:'AstraZeneca',          location:'Cambridge, UK',    type:'Graduate',   deadline:'May 22, 2026', sector:'Healthcare & Life Sciences', role:'Clinical Research'},
+  {id:19,title:'Clinical Data Management Intern',                company:'Roche',                location:'Welwyn, UK',       type:'Internship', deadline:'May 25, 2026', sector:'Healthcare & Life Sciences', role:'Clinical Research'},
+  {id:20,title:'Biostatistics Internship',                       company:'Amgen',                location:'Cambridge, UK',    type:'Internship', deadline:'May 28, 2026', sector:'Healthcare & Life Sciences', role:'Clinical Research'},
+  /* ── Life Sciences – Pharmacovigilance / Drug Safety ─────── */
+  {id:21,title:'Pharmacovigilance & Drug Safety Intern',         company:'Johnson & Johnson',    location:'High Wycombe, UK', type:'Internship', deadline:'Jun 1, 2026',  sector:'Healthcare & Life Sciences', role:'Pharmacovigilance'},
+  {id:22,title:'Drug Safety Scientist Graduate Programme',       company:'Novartis',             location:'Farnborough, UK',  type:'Graduate',   deadline:'Jun 5, 2026',  sector:'Healthcare & Life Sciences', role:'Pharmacovigilance'},
+  /* ── Life Sciences – Commercial / Marketing ──────────────── */
+  {id:23,title:'Pharmaceutical Marketing & Insights Graduate',   company:'AbbVie',               location:'Maidenhead, UK',   type:'Graduate',   deadline:'Jun 8, 2026',  sector:'Healthcare & Life Sciences', role:'Commercial'},
+  {id:24,title:'Commercial Excellence Intern – Specialty Care',  company:'Takeda',               location:'London, UK',       type:'Internship', deadline:'Jun 10, 2026', sector:'Healthcare & Life Sciences', role:'Commercial'},
+  /* ── CRO / SaaS ──────────────────────────────────────────── */
+  {id:25,title:'Veeva Vault Implementation Consultant Intern',   company:'Veeva Systems',        location:'Remote / London',  type:'Internship', deadline:'Jun 12, 2026', sector:'Healthcare & Life Sciences', role:'Technology'},
+  {id:26,title:'Clinical Informatics & Digital Health Intern',   company:'AstraZeneca',          location:'Cambridge, UK',    type:'Internship', deadline:'Jun 15, 2026', sector:'Healthcare & Life Sciences', role:'Technology'},
+];
+
+const ROLE_FILTERS=['Regulatory Affairs','Medical Affairs','Quality Assurance','Market Access','Clinical Research','Pharmacovigilance','Commercial','Technology','Research'];
+
+const NEWS_ARTICLES=[
+  {id:1, title:'Takeda Launches £500M AI Drug Discovery Centre in London',               summary:'Japanese pharma giant Takeda has announced a landmark investment to establish a dedicated artificial intelligence research hub in London, focusing on rare disease and oncology pipelines.',      source:'PharmaLive',        time:'1 hour ago',   sector:'Healthcare',  company:'Takeda'},
+  {id:2, title:'Veeva Systems Releases Vault Clinical Suite 24.3 Update',                summary:'Veeva Systems has rolled out a major update to its Vault Clinical platform, introducing AI-assisted document review, enhanced eTMF compliance tools, and improved audit trail dashboards.',     source:'Veeva Blog',        time:'2 hours ago',  sector:'Technology',  company:'Veeva'},
+  {id:3, title:'AstraZeneca CRISPR Cancer Therapy Shows 78% Response Rate in Phase III', summary:'AstraZeneca\'s novel gene-editing cancer treatment achieved a 78% objective response rate in its pivotal Phase III trial, raising hopes for approval by the MHRA and FDA by late 2026.',      source:'The Lancet',        time:'3 hours ago',  sector:'Healthcare',  company:'AstraZeneca'},
+  {id:4, title:'Amgen Acquires UK Biotech Firm in £1.2B Deal',                           summary:'Amgen has completed its acquisition of a UK-based rare disease biotech, adding three late-stage assets to its pipeline and significantly expanding its European commercial footprint.',           source:'FiercePharma',      time:'5 hours ago',  sector:'Finance',     company:'Amgen'},
+  {id:5, title:'FDA Approves Johnson & Johnson\'s Next-Gen Biologic for IBD',            summary:'The US Food and Drug Administration has granted approval to J&J\'s newly developed biologic therapy for moderate-to-severe inflammatory bowel disease, marking a major commercial milestone.',    source:'Reuters Health',    time:'7 hours ago',  sector:'Healthcare',  company:'J&J'},
+  {id:6, title:'AbbVie Publishes Positive Phase II Data for Parkinson\'s Asset',         summary:'AbbVie\'s investigational compound for Parkinson\'s disease demonstrated significant motor improvement versus placebo in a 400-patient Phase II study, paving the way for pivotal trials.',    source:'BioPharma Dive',    time:'9 hours ago',  sector:'Healthcare',  company:'AbbVie'},
+  {id:7, title:'UK MHRA Streamlines Regulatory Pathways for Advanced Therapies',         summary:'The UK\'s Medicines and Healthcare products Regulatory Agency has published revised guidance for ATMPs, introducing a new accelerated pathway to support faster market access for cell and gene therapies.', source:'MHRA News', time:'12 hours ago', sector:'Regulatory',  company:'MHRA'},
+  {id:8, title:'Pfizer Reports 14% Revenue Growth Driven by Oncology Portfolio',         summary:'Pfizer\'s Q1 2026 earnings showed double-digit growth across its oncology and rare disease units, with revenues beating analyst expectations by $800M despite falling COVID-19 product sales.', source:'Wall Street Journal',time:'1 day ago',    sector:'Finance',     company:'Pfizer'},
+  {id:9, title:'Roche\'s Digital Pathology Platform Cuts Diagnostic Time by 40%',       summary:'Roche has published real-world evidence demonstrating that its AI-powered digital pathology system reduces time-to-diagnosis by 40% across three NHS hospital trusts.',                         source:'Roche Newsroom',    time:'1 day ago',    sector:'Technology',  company:'Roche'},
+  {id:10,title:'Graduate Life Sciences Hiring Up 22% Despite Broader Market Slowdown',  summary:'A new report from the Association of the British Pharmaceutical Industry reveals graduate hiring across pharma and biotech increased 22% year-on-year, with regulatory affairs and medical affairs roles seeing the sharpest rise.', source:'ABPI Report', time:'2 days ago', sector:'Careers', company:'ABPI'},
+  {id:11,title:'Novartis to Hire 400 UK Graduates in 2026 Expansion Drive',             summary:'Novartis has announced plans to hire 400 UK graduates across its commercial, medical and clinical operations teams as part of its post-Brexit UK investment strategy.',                         source:'Graduate Fog',      time:'2 days ago',   sector:'Careers',     company:'Novartis'},
+  {id:12,title:'How to Break into Regulatory Affairs: Insider Tips from Industry Pros', summary:'We spoke to regulatory affairs leaders at top pharmaceutical companies about what they look for in graduate applicants, common mistakes to avoid, and the fastest routes into the field.',       source:'Life Sci Careers',  time:'3 days ago',   sector:'Careers',     company:'Various'},
+];
+
+const STATUS_LIST=[
+  {key:'pending',   label:'Pending',   emoji:'⏱', color:'#f59e0b', bg:'#fef3c7'},
+  {key:'applied',   label:'Applied',   emoji:'📋', color:'#3b82f6', bg:'#dbeafe'},
+  {key:'interview', label:'Interview', emoji:'🤝', color:'#8b5cf6', bg:'#ede9fe'},
+  {key:'offer',     label:'Offer',     emoji:'✅', color:'#10b981', bg:'#d1fae5'},
+  {key:'rejected',  label:'Rejected',  emoji:'❌', color:'#ef4444', bg:'#fee2e2'},
+];
+
+const CALENDAR_EVENTS=[
+  {id:1, company:'AstraZeneca', title:'Online Assessment',   date:'Mar 17', time:'10:00 AM – 11:00 AM', color:'#eef2ff'},
+  {id:2, company:'Takeda',      title:'HR Interview',        date:'Mar 17', time:'2:00 PM – 2:45 PM',   color:'#f0fdf4'},
+  {id:3, company:'Pfizer',      title:'Technical Interview', date:'Mar 18', time:'11:00 AM – 12:00 PM', color:'#fef9c3'},
+  {id:4, company:'Amgen',       title:'Assessment Centre',   date:'Mar 20', time:'9:00 AM – 1:00 PM',   color:'#f3f4f6'},
+  {id:5, company:'AbbVie',      title:'Final Interview',     date:'Mar 22', time:'3:00 PM – 4:00 PM',   color:'#fce7f3'},
+];
+
+/* ══════════════════════════════════════════
+   ICONS
+══════════════════════════════════════════ */
+const Bell=({c='currentColor',s=22})=><svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>;
+const SearchIco=({c=G4,s=20})=><svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>;
+const ChevR=({s=18,c='currentColor'})=><svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2.5" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg>;
+const ChevL=({s=18,c='currentColor'})=><svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2.5" strokeLinecap="round"><polyline points="15 18 9 12 15 6"/></svg>;
+const ChevD=({s=16,c='currentColor'})=><svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round"><polyline points="6 9 12 15 18 9"/></svg>;
+const XIco=({s=18,c='currentColor'})=><svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>;
+const Plus=({s=24,c=W})=><svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>;
+const BookmarkIco=({filled,s=20})=><svg width={s} height={s} viewBox="0 0 24 24" fill={filled?P:'none'} stroke={filled?P:G4} strokeWidth="2" strokeLinecap="round"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg>;
+const FilterIco=({s=14,c='currentColor'})=><svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="11" y1="18" x2="13" y2="18"/></svg>;
+const ArrowUp=({s=16,c='currentColor'})=><svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>;
+const LocationIco=({s=13,c=G4})=><svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>;
+const ClockIco=({s=13,c=G4})=><svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>;
+const TagIco=({s=13,c=G4})=><svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>;
+const PersonIco=({s=20,c='currentColor'})=><svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>;
+const EmailIco=({s=18,c='currentColor'})=><svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>;
+const LockIco=({s=18,c='currentColor'})=><svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>;
+const CheckIco=({s=16,c=P})=><svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="3" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>;
+const EditIco=({s=18,c='currentColor'})=><svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>;
+const LogoutIco=({s=18,c='currentColor'})=><svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>;
+const StarIco=({s=18,c='currentColor'})=><svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>;
+/* Nav icons */
+const HomeNav=({a})=><svg width="22" height="22" viewBox="0 0 24 24" fill={a?P:'none'} stroke={a?P:G4} strokeWidth="1.8"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22" stroke={a?P:G4}/></svg>;
+const AppNav=({a})=><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={a?P:G4} strokeWidth="1.8"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg>;
+const ExploreNav=({a})=><svg width="22" height="22" viewBox="0 0 24 24" fill={a?PL:'none'} stroke={a?P:G4} strokeWidth="1.8"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76" fill={a?P:G4} stroke="none"/></svg>;
+const CalNav=({a})=><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={a?P:G4} strokeWidth="1.8"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>;
+const NewsNav=({a})=><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={a?P:G4} strokeWidth="1.8"><path d="M4 22h14a2 2 0 002-2V7.5L14.5 2H6a2 2 0 00-2 2v4"/><polyline points="14 2 14 8 20 8"/><path d="M2 15h10M2 19h10M2 11h4"/></svg>;
+
+/* ══════════════════════════════════════════
+   SHARED UI COMPONENTS
+══════════════════════════════════════════ */
+const ProgressBar=({pct,color=P})=>(
+  <div style={{background:G5,borderRadius:99,height:8,overflow:'hidden'}}>
+    <div style={{width:`${pct}%`,height:'100%',background:color,borderRadius:99,transition:'width .6s'}}/>
+  </div>
+);
+
+const SearchInput=({placeholder,value,onChange,autoFocus})=>(
+  <div style={{position:'relative'}}>
+    <input autoFocus={autoFocus} type="text" placeholder={placeholder} value={value} onChange={onChange}
+      style={{width:'100%',background:G6,border:'none',borderRadius:14,padding:'12px 44px 12px 16px',fontSize:14,color:G1,outline:'none'}}/>
+    <div style={{position:'absolute',right:14,top:'50%',transform:'translateY(-50%)',color:P,display:'flex'}}>
+      <SearchIco c={P}/>
+    </div>
+  </div>
+);
+
+const StatusBadge=({status})=>{
+  const s=STATUS_LIST.find(x=>x.key===status)||STATUS_LIST[0];
+  return <span style={{fontSize:11,fontWeight:700,padding:'3px 10px',borderRadius:20,background:s.bg,color:s.color,whiteSpace:'nowrap'}}>{s.label}</span>;
+};
+
+const Chip=({label,active,onClick,small})=>(
+  <button onClick={onClick} className="press"
+    style={{padding:small?'5px 12px':'7px 16px',borderRadius:20,border:`1.5px solid ${active?P:G5}`,
+      background:active?PL:W,color:active?P:G2,fontSize:13,fontWeight:600,whiteSpace:'nowrap',flexShrink:0,transition:'all .15s'}}>
+    {label}
+  </button>
+);
+
+const DragHandle=()=><div style={{width:40,height:4,background:G5,borderRadius:99,margin:'0 auto 16px'}}/>;
+
+const NavBar=({tab,setTab})=>{
+  const tabs=[
+    {id:'dashboard', label:'Dashboard',   Icon:HomeNav},
+    {id:'applications',label:'Applications',Icon:AppNav},
+    {id:'explore',   label:'Explore',     Icon:ExploreNav},
+    {id:'calendar',  label:'Calendar',    Icon:CalNav},
+    {id:'news',      label:'News',        Icon:NewsNav},
+  ];
+  return(
+    <div style={{background:W,borderTop:`1px solid ${G5}`,display:'flex',flexShrink:0,paddingBottom:'env(safe-area-inset-bottom)'}}>
+      {tabs.map(({id,label,Icon})=>(
+        <button key={id} onClick={()=>setTab(id)} className="press"
+          style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:3,
+            padding:'8px 4px 10px',background:'none',border:'none',color:tab===id?P:G4}}>
+          <Icon a={tab===id}/>
+          <span style={{fontSize:10,fontWeight:600}}>{label}</span>
+        </button>
+      ))}
+    </div>
+  );
+};
+
+const StatusBar=()=>(
+  <div style={{background:'transparent',padding:'14px 20px 4px',display:'flex',justifyContent:'space-between',alignItems:'center',flexShrink:0}}>
+    <span style={{fontWeight:700,fontSize:14,color:G1}}>9:41</span>
+    <div style={{display:'flex',gap:5,alignItems:'center'}}>
+      <svg width="15" height="11" viewBox="0 0 15 11" fill={G1}><rect x="0" y="5" width="2.5" height="6" rx="1" opacity=".35"/><rect x="4" y="3.5" width="2.5" height="7.5" rx="1" opacity=".55"/><rect x="8" y="1.5" width="2.5" height="9.5" rx="1" opacity=".75"/><rect x="12" y="0" width="2.5" height="11" rx="1"/></svg>
+      <svg width="14" height="11" viewBox="0 0 18 13" fill={G1}><path d="M9 3C11.6 3 13.9 4.1 15.5 5.9L17 4.3C15 2.2 12.2.7 9 .7S3 2.2 1 4.3L2.5 5.9C4.1 4.1 6.4 3 9 3z" opacity=".35"/><path d="M9 6.5c1.6 0 3.1.7 4.1 1.9L14.8 6.6C13.4 5 11.3 4 9 4S4.6 5 3.2 6.6L4.9 8.4C5.9 7.2 7.4 6.5 9 6.5z" opacity=".7"/><circle cx="9" cy="11.5" r="1.8"/></svg>
+      <svg width="23" height="11" viewBox="0 0 23 11" fill="none"><rect x=".5" y=".5" width="20" height="10" rx="2" stroke={G1}/><rect x="1.5" y="1.5" width="16" height="8" rx="1.5" fill={G1}/><rect x="21.5" y="3.5" width="2" height="4" rx="1" fill={G1} opacity=".4"/></svg>
+    </div>
+  </div>
+);
+
+/* ══════════════════════════════════════════
+   NOTIFICATIONS PANEL
+══════════════════════════════════════════ */
+function NotificationsPanel({onClose, savedSectors, studyLevel}){
+  const studyLabel = STUDY_LEVELS.find(s=>s.key===studyLevel)?.label||'Student';
+  const relevantOpps = OPPORTUNITIES.filter(o=>
+    savedSectors.some(s=>o.sector.includes(s))||savedSectors.length===0
+  ).slice(0,5);
+
+  const systemNotifs=[
+    {id:'n1', type:'match',   emoji:'🎯', title:'New match for you',                  body:`${relevantOpps[0]?.title||'Regulatory Affairs Intern'} at ${relevantOpps[0]?.company||'Takeda'} matches your preferences.`, time:'Just now'},
+    {id:'n2', type:'deadline',emoji:'⚠️', title:'Deadline approaching',               body:`Your application to AstraZeneca QA Graduate closes in 3 days.`, time:'2h ago'},
+    {id:'n3', type:'news',    emoji:'📰', title:'Industry update',                    body:'AbbVie published positive Phase II data relevant to your Medical Affairs interests.', time:'5h ago'},
+    {id:'n4', type:'match',   emoji:'🎯', title:`${relevantOpps[1]?.company||'Amgen'} is hiring`,body:`A new ${studyLabel} opportunity in ${savedSectors[0]||'Life Sciences'} was just posted.`,'time':'1d ago'},
+    {id:'n5', type:'tip',     emoji:'💡', title:'Profile tip',                        body:'Adding your GPA and key modules increases profile visibility by 40%.', time:'2d ago'},
+  ];
+
+  return(
+    <div style={{position:'absolute',top:0,left:0,right:0,zIndex:150,boxShadow:'0 8px 32px rgba(0,0,0,0.15)'}}>
+      <div className="notif-panel">
+        <div style={{padding:'20px 20px 0',borderBottom:`1px solid ${G5}`}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
+            <h3 style={{fontWeight:800,fontSize:18,color:G1}}>Notifications</h3>
+            <div style={{display:'flex',gap:8,alignItems:'center'}}>
+              <button style={{fontSize:12,fontWeight:700,color:P,background:PL,border:'none',borderRadius:20,padding:'4px 10px'}}>Mark all read</button>
+              <button onClick={onClose} className="press" style={{background:G6,border:'none',borderRadius:'50%',width:28,height:28,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                <XIco s={14} c={G3}/>
+              </button>
+            </div>
+          </div>
+        </div>
+        <div style={{maxHeight:380,overflowY:'auto'}}>
+          {systemNotifs.map((n,i)=>(
+            <div key={n.id} style={{display:'flex',gap:12,padding:'14px 20px',borderBottom:i<systemNotifs.length-1?`1px solid ${G6}`:'',
+              background:i===0?PL+33:'transparent'}}>
+              <div style={{width:40,height:40,borderRadius:14,background:i===0?PL:G6,display:'flex',alignItems:'center',justifyContent:'center',fontSize:18,flexShrink:0}}>
+                {n.emoji}
+              </div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:2}}>
+                  <p style={{fontWeight:700,fontSize:13,color:G1,lineHeight:1.2}}>{n.title}</p>
+                  <span style={{fontSize:10,color:G4,whiteSpace:'nowrap',marginLeft:8}}>{n.time}</span>
+                </div>
+                <p style={{fontSize:12,color:G3,lineHeight:1.4}}>{n.body}</p>
+              </div>
+              {i===0&&<div style={{width:8,height:8,borderRadius:99,background:P,flexShrink:0,marginTop:4}}/>}
+            </div>
+          ))}
+        </div>
+        <div style={{padding:'12px 20px 0',borderTop:`1px solid ${G5}`}}>
+          <button style={{width:'100%',background:G6,border:'none',borderRadius:12,padding:'11px',fontSize:13,fontWeight:600,color:G2}}>View all notifications</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════
+   PROFILE PANEL (sheet)
+══════════════════════════════════════════ */
+function ProfilePanel({onClose, userName, studyLevel, setStudyLevel, savedSectors, setSavedSectors, onLogout}){
+  const [view,setView]=useState('main'); // main | editStudy | editSectors
+  const sl=STUDY_LEVELS.find(s=>s.key===studyLevel);
+
+  if(view==='editStudy') return(
+    <div className="sheet-overlay" onClick={onClose}>
+      <div className="sheet fade-in" onClick={e=>e.stopPropagation()}>
+        <div style={{padding:'20px 20px 0'}}>
+          <DragHandle/>
+          <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4}}>
+            <button onClick={()=>setView('main')} style={{background:'none',border:'none',color:P,fontSize:13,fontWeight:700,padding:0}}>← Back</button>
+          </div>
+          <h3 style={{fontWeight:800,fontSize:18,color:G1,marginBottom:4}}>Level of Study</h3>
+          <p style={{fontSize:13,color:G3,marginBottom:20}}>Update your current academic level</p>
+          {STUDY_LEVELS.map(s=>{
+            const active=studyLevel===s.key;
+            return(
+              <button key={s.key} onClick={()=>{setStudyLevel(s.key);setView('main');}} className="press"
+                style={{width:'100%',display:'flex',alignItems:'center',gap:14,padding:'14px 16px',
+                  marginBottom:8,borderRadius:16,border:`2px solid ${active?P:G5}`,
+                  background:active?PL:W,textAlign:'left',transition:'all .15s'}}>
+                <span style={{fontSize:24}}>{s.emoji}</span>
+                <div style={{flex:1}}>
+                  <p style={{fontWeight:700,fontSize:14,color:active?PD:G1}}>{s.label}</p>
+                  <p style={{fontSize:12,color:G4,marginTop:1}}>{s.desc}</p>
+                </div>
+                {active&&<CheckIco s={18} c={P}/>}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+
+  if(view==='editSectors') return(
+    <div className="sheet-overlay" onClick={onClose}>
+      <div className="sheet fade-in" style={{maxHeight:'85vh',overflowY:'auto'}} onClick={e=>e.stopPropagation()}>
+        <div style={{padding:'20px 20px 0'}}>
+          <DragHandle/>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}}>
+            <button onClick={()=>setView('main')} style={{background:'none',border:'none',color:P,fontSize:13,fontWeight:700,padding:0}}>← Back</button>
+            <button onClick={()=>{setSavedSectors([]);}} style={{background:'none',border:'none',color:G4,fontSize:12,fontWeight:600,padding:0}}>Clear all</button>
+          </div>
+          <h3 style={{fontWeight:800,fontSize:18,color:G1,marginBottom:4}}>Industry Preferences</h3>
+          <p style={{fontSize:13,color:G3,marginBottom:20}}>Choose sectors to personalise recommendations</p>
+          <div style={{display:'flex',flexWrap:'wrap',gap:8,paddingBottom:24}}>
+            {SECTORS.map(s=>{
+              const active=savedSectors.includes(s);
+              return(
+                <button key={s} onClick={()=>setSavedSectors(p=>active?p.filter(x=>x!==s):[...p,s])} className="press"
+                  style={{padding:'9px 16px',borderRadius:12,border:`1.5px solid ${active?P:G5}`,
+                    background:active?PL:W,color:active?P:G2,fontSize:13,fontWeight:600,transition:'all .15s'}}>
+                  {active&&<span style={{marginRight:4}}>✓</span>}{s}
+                </button>
+              );
+            })}
+          </div>
+          <button onClick={()=>setView('main')} className="press"
+            style={{width:'100%',background:P,color:W,border:'none',borderRadius:14,padding:'14px',fontSize:15,fontWeight:700,
+              boxShadow:`0 4px 14px ${P}44`,marginBottom:8}}>
+            Save Preferences
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  // Main profile view
+  return(
+    <div className="sheet-overlay" onClick={onClose}>
+      <div className="sheet fade-in" onClick={e=>e.stopPropagation()}>
+        <div style={{padding:'20px 20px 0'}}>
+          <DragHandle/>
+          {/* Avatar row */}
+          <div style={{display:'flex',alignItems:'center',gap:14,marginBottom:20,paddingBottom:20,borderBottom:`1px solid ${G5}`}}>
+            <div style={{width:56,height:56,borderRadius:'50%',background:`linear-gradient(135deg,${P},${PD})`,
+              display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+              <span style={{fontSize:24,color:W,fontWeight:800}}>{(userName||'S')[0].toUpperCase()}</span>
+            </div>
+            <div>
+              <p style={{fontWeight:800,fontSize:17,color:G1}}>{userName}</p>
+              <p style={{fontSize:13,color:G3,marginTop:2}}>{sl?.label||'Student'} · {savedSectors.slice(0,2).join(', ')||'Life Sciences'}</p>
+            </div>
+          </div>
+
+          {/* Settings rows */}
+          {[
+            {icon:'🎓',label:'Level of Study',val:sl?.label||'Not set',action:()=>setView('editStudy')},
+            {icon:'🎯',label:'Industry Preferences',val:`${savedSectors.length} sector${savedSectors.length!==1?'s':''} selected`,action:()=>setView('editSectors')},
+            {icon:'🔔',label:'Notification Settings',val:'Tailored alerts on',action:()=>{}},
+            {icon:'🔒',label:'Privacy & Data',val:'',action:()=>{}},
+          ].map(({icon,label,val,action})=>(
+            <button key={label} onClick={action} className="press"
+              style={{width:'100%',display:'flex',alignItems:'center',gap:12,padding:'13px 0',
+                borderBottom:`1px solid ${G6}`,background:'none',border:'none',borderBottom:`1px solid ${G6}`,
+                textAlign:'left',cursor:'pointer'}}>
+              <div style={{width:36,height:36,borderRadius:12,background:G6,display:'flex',alignItems:'center',justifyContent:'center',fontSize:17,flexShrink:0}}>
+                {icon}
+              </div>
+              <div style={{flex:1}}>
+                <p style={{fontSize:14,fontWeight:600,color:G1}}>{label}</p>
+                {val&&<p style={{fontSize:12,color:G4,marginTop:1}}>{val}</p>}
+              </div>
+              <ChevR s={16} c={G4}/>
+            </button>
+          ))}
+
+          <button onClick={onLogout} className="press"
+            style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:8,
+              marginTop:16,padding:'13px',borderRadius:14,border:`1.5px solid #fee2e2`,
+              background:'#fff5f5',color:'#ef4444',fontSize:14,fontWeight:700}}>
+            <LogoutIco s={16} c="#ef4444"/> Sign Out
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════
+   ONBOARDING — STUDY LEVEL (new screen)
+══════════════════════════════════════════ */
+function OnboardingStudyLevel({onNext}){
+  const [selected,setSelected]=useState(null);
+  return(
+    <div className="slide-in" style={{flex:1,display:'flex',flexDirection:'column',padding:'0 24px 24px'}}>
+      <div style={{textAlign:'center',padding:'24px 0 28px'}}>
+        <span style={{fontSize:44}}>🎓</span>
+        <h2 style={{fontSize:22,fontWeight:800,color:G1,marginTop:14,marginBottom:8}}>What's your level of study?</h2>
+        <p style={{fontSize:14,color:G3,lineHeight:1.5}}>We'll tailor opportunities to match your academic stage</p>
+      </div>
+
+      <div style={{flex:1,display:'flex',flexDirection:'column',gap:10,overflowY:'auto',paddingBottom:8}}>
+        {STUDY_LEVELS.map(s=>{
+          const active=selected===s.key;
+          return(
+            <button key={s.key} onClick={()=>setSelected(s.key)} className="press"
+              style={{display:'flex',alignItems:'center',gap:14,padding:'16px 18px',borderRadius:18,
+                border:`2px solid ${active?P:G5}`,background:active?PL:W,textAlign:'left',
+                transition:'all .2s',boxShadow:active?`0 4px 14px ${P}22`:'none'}}>
+              <div style={{width:48,height:48,borderRadius:16,background:active?P:G6,
+                display:'flex',alignItems:'center',justifyContent:'center',fontSize:22,flexShrink:0,
+                transition:'background .2s'}}>
+                {s.emoji}
+              </div>
+              <div style={{flex:1}}>
+                <p style={{fontWeight:700,fontSize:15,color:active?PD:G1}}>{s.label}</p>
+                <p style={{fontSize:12,color:G4,marginTop:2}}>{s.desc}</p>
+              </div>
+              <div style={{width:22,height:22,borderRadius:'50%',border:`2px solid ${active?P:G5}`,
+                background:active?P:W,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,transition:'all .2s'}}>
+                {active&&<CheckIco s={12} c={W}/>}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      <button onClick={()=>selected&&onNext(selected)} className="press"
+        style={{width:'100%',background:selected?P:G5,color:selected?W:G4,border:'none',borderRadius:14,
+          padding:'15px',fontSize:15,fontWeight:700,marginTop:16,transition:'all .2s',
+          boxShadow:selected?`0 4px 14px ${P}44`:'none'}}>
+        Continue
+      </button>
+      <button onClick={()=>onNext('undergrad')} style={{background:'none',border:'none',color:G4,marginTop:12,fontSize:14,width:'100%',padding:'8px'}}>Skip for now</button>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════
+   ONBOARDING — SECTORS
+══════════════════════════════════════════ */
+function OnboardingSectors({onNext}){
+  const [selected,setSelected]=useState([]);
+  const toggle=s=>setSelected(p=>p.includes(s)?p.filter(x=>x!==s):[...p,s]);
+  return(
+    <div className="slide-in" style={{flex:1,display:'flex',flexDirection:'column',padding:'0 24px 24px'}}>
+      <div style={{textAlign:'center',padding:'24px 0 24px'}}>
+        <span style={{fontSize:44}}>🎯</span>
+        <h2 style={{fontSize:22,fontWeight:800,color:G1,marginTop:14,marginBottom:8}}>What interests you?</h2>
+        <p style={{fontSize:13,color:G3,lineHeight:1.5}}>Select sectors to personalise your experience</p>
+      </div>
+      <p style={{fontSize:12,fontWeight:700,color:G4,letterSpacing:'0.07em',marginBottom:10}}>CHOOSE YOUR SECTORS</p>
+      <div style={{flex:1,overflowY:'auto',marginBottom:16}}>
+        <div style={{display:'flex',flexWrap:'wrap',gap:8,paddingBottom:8}}>
+          {SECTORS.map(s=>{
+            const active=selected.includes(s);
+            return(
+              <button key={s} onClick={()=>toggle(s)} className="press"
+                style={{padding:'9px 16px',borderRadius:12,border:`1.5px solid ${active?P:G5}`,
+                  background:active?PL:W,color:active?P:G2,fontSize:13,fontWeight:600,transition:'all .15s'}}>
+                {active&&'✓ '}{s}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      {selected.length>0&&<p style={{fontSize:12,color:G3,textAlign:'center',marginBottom:8}}>{selected.length} sector{selected.length!==1?'s':''} selected</p>}
+      <button onClick={()=>onNext(selected)} className="press"
+        style={{width:'100%',background:P,color:W,border:'none',borderRadius:14,padding:'15px',
+          fontSize:15,fontWeight:700,boxShadow:`0 4px 14px ${P}44`}}>
+        Continue
+      </button>
+      <button onClick={()=>onNext([])} style={{background:'none',border:'none',color:G4,marginTop:12,fontSize:14,width:'100%',padding:'8px'}}>Skip for now</button>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════
+   LOGIN SCREEN
+══════════════════════════════════════════ */
+function LoginScreen({onLogin}){
+  const [email,setEmail]=useState('');
+  const [pass,setPass]=useState('');
+  return(
+    <div className="slide-in" style={{flex:1,display:'flex',flexDirection:'column',padding:'0 24px'}}>
+      <div style={{flex:1,display:'flex',flexDirection:'column',justifyContent:'center'}}>
+        <div style={{display:'flex',flexDirection:'column',alignItems:'center',marginBottom:40}}>
+          <div style={{width:68,height:68,background:PL,borderRadius:20,display:'flex',alignItems:'center',justifyContent:'center',marginBottom:20}}>
+            <svg width="34" height="38" viewBox="0 0 34 38" fill="none">
+              <path d="M17 0L0 8v9c0 11.5 7.2 22.2 17 24.8 9.8-2.6 17-13.3 17-24.8V8L17 0z" fill={P}/>
+              <path d="M12 19l4 4 6-7" stroke={W} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </div>
+          <h1 style={{fontSize:24,fontWeight:800,color:G1}}>Welcome to Vitae</h1>
+          <p style={{fontSize:14,color:G3,marginTop:6}}>Join thousands of professionals</p>
+        </div>
+        <div style={{display:'flex',flexDirection:'column',gap:12,marginBottom:16}}>
+          <div style={{position:'relative'}}>
+            <div style={{position:'absolute',left:16,top:'50%',transform:'translateY(-50%)',color:G4}}><EmailIco/></div>
+            <input type="email" placeholder="Enter your email" value={email} onChange={e=>setEmail(e.target.value)}
+              style={{width:'100%',background:G6,border:`1.5px solid ${G5}`,borderRadius:14,padding:'14px 16px 14px 48px',fontSize:15,color:G1,outline:'none'}}/>
+          </div>
+          <div style={{position:'relative'}}>
+            <div style={{position:'absolute',left:16,top:'50%',transform:'translateY(-50%)',color:G4}}><LockIco/></div>
+            <input type="password" placeholder="Enter your password" value={pass} onChange={e=>setPass(e.target.value)}
+              style={{width:'100%',background:G6,border:`1.5px solid ${G5}`,borderRadius:14,padding:'14px 16px 14px 48px',fontSize:15,color:G1,outline:'none'}}/>
+          </div>
+          <button onClick={()=>onLogin(email||'sarah@gmail.com')} className="press"
+            style={{background:P,color:W,border:'none',borderRadius:14,padding:'15px',fontSize:15,fontWeight:700,boxShadow:`0 4px 14px ${P}44`}}>
+            Continue
+          </button>
+          <p style={{textAlign:'center',fontSize:13,color:G3,cursor:'pointer'}}>Forgot Password?</p>
+        </div>
+        <div style={{display:'flex',alignItems:'center',gap:12,margin:'8px 0 20px'}}>
+          <div style={{flex:1,height:1,background:G5}}/><span style={{fontSize:13,color:G4,whiteSpace:'nowrap'}}>or continue with</span><div style={{flex:1,height:1,background:G5}}/>
+        </div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:20}}>
+          {[{l:'Apple',e:'🍎'},{l:'Google',e:'G'}].map(({l,e})=>(
+            <button key={l} onClick={()=>onLogin('sarah@gmail.com')} className="press"
+              style={{display:'flex',alignItems:'center',justifyContent:'center',gap:8,padding:'12px',
+                border:`1.5px solid ${G5}`,borderRadius:14,background:W,fontSize:14,fontWeight:600,color:G2}}>
+              <span style={{fontSize:16}}>{e}</span>{l}
+            </button>
+          ))}
+        </div>
+        <p style={{textAlign:'center',fontSize:14,color:G3}}>
+          Not yet registered? <span onClick={()=>onLogin('sarah@gmail.com')} style={{color:P,fontWeight:700,cursor:'pointer'}}>Sign Up</span>
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════
+   ONBOARDING — WELCOME & NAME
+══════════════════════════════════════════ */
+function OnboardingWelcome({onStart}){
+  return(
+    <div className="slide-in" style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'0 24px 40px'}}>
+      <div style={{width:80,height:80,background:PL,borderRadius:24,display:'flex',alignItems:'center',justifyContent:'center',marginBottom:32,fontSize:40}}>✨</div>
+      <h1 style={{fontSize:26,fontWeight:800,color:G1,textAlign:'center',marginBottom:10}}>Welcome to Vitae</h1>
+      <p style={{fontSize:15,color:G3,textAlign:'center',lineHeight:1.6,marginBottom:52}}>Join thousands of professionals tracking their career journey</p>
+      <button onClick={onStart} className="press"
+        style={{width:'100%',background:P,color:W,border:'none',borderRadius:14,padding:'16px',fontSize:16,fontWeight:700,boxShadow:`0 4px 14px ${P}44`}}>
+        Get Started
+      </button>
+      <button onClick={onStart} style={{background:'none',border:'none',color:G4,marginTop:16,fontSize:14}}>Skip for now</button>
+    </div>
+  );
+}
+
+function OnboardingName({onNext}){
+  const [name,setName]=useState('');
+  return(
+    <div className="slide-in" style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'0 24px 40px'}}>
+      <span style={{fontSize:52,marginBottom:24}}>✨</span>
+      <h2 style={{fontSize:22,fontWeight:800,color:G1,textAlign:'center',marginBottom:8}}>What should we call you?</h2>
+      <p style={{fontSize:14,color:G3,textAlign:'center',marginBottom:40}}>Help us personalise your Vitae experience</p>
+      <div style={{width:'100%',position:'relative',marginBottom:16}}>
+        <div style={{position:'absolute',left:16,top:'50%',transform:'translateY(-50%)',color:G4}}><PersonIco s={18}/></div>
+        <input value={name} onChange={e=>setName(e.target.value)} placeholder="Enter your first name"
+          style={{width:'100%',background:G6,border:`1.5px solid ${G5}`,borderRadius:14,padding:'14px 16px 14px 46px',fontSize:15,color:G1,outline:'none'}}/>
+      </div>
+      <button onClick={()=>onNext(name||'Sarah')} className="press"
+        style={{width:'100%',background:P,color:W,border:'none',borderRadius:14,padding:'15px',fontSize:15,fontWeight:700,boxShadow:`0 4px 14px ${P}44`}}>
+        Continue
+      </button>
+      <button onClick={()=>onNext('Sarah')} style={{background:'none',border:'none',color:G4,marginTop:16,fontSize:14}}>Skip for now</button>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════
+   DASHBOARD SCREEN
+══════════════════════════════════════════ */
+function DashboardScreen({userName,applications,savedIds,studyLevel,savedSectors,onBell,onProfile}){
+  const total=applications.length;
+  const applied=applications.filter(a=>a.status!=='pending').length;
+  const inProgress=applications.filter(a=>['applied','interview'].includes(a.status)).length;
+  const interviews=applications.filter(a=>a.status==='interview').length;
+  const offers=applications.filter(a=>a.status==='offer').length;
+  const rejected=applications.filter(a=>a.status==='rejected').length;
+  const pct=total>0?Math.round(applied/total*100):0;
+
+  return(
+    <div className="slide-in scroll-area" style={{background:BG}}>
+      {/* Purple header */}
+      <div style={{background:P,padding:'4px 20px 36px',borderRadius:'0 0 28px 28px'}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+          <div>
+            <h1 style={{color:W,fontSize:26,fontWeight:800}}>Hello {userName}!</h1>
+            <p style={{color:'rgba(221,214,254,0.85)',fontSize:13,marginTop:2}}>
+              {new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}
+            </p>
+          </div>
+          <div style={{display:'flex',gap:8}}>
+            <button onClick={onBell} className="press"
+              style={{width:42,height:42,borderRadius:'50%',background:'rgba(255,255,255,0.15)',border:'none',
+                display:'flex',alignItems:'center',justifyContent:'center',position:'relative'}}>
+              <Bell c={W} s={20}/>
+              <span style={{position:'absolute',top:8,right:9,width:8,height:8,borderRadius:99,background:'#fb923c',border:'2px solid '+P}}/>
+            </button>
+            <button onClick={onProfile} className="press"
+              style={{width:42,height:42,borderRadius:'50%',background:'rgba(255,255,255,0.2)',border:'none',
+                display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden'}}>
+              <span style={{fontSize:17,fontWeight:800,color:W}}>{(userName||'S')[0].toUpperCase()}</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div style={{padding:'0 16px 32px',marginTop:-20,display:'flex',flexDirection:'column',gap:12}}>
+        {/* Progress card */}
+        <div style={{background:W,borderRadius:20,padding:'18px 20px',boxShadow:'0 2px 14px rgba(0,0,0,0.07)'}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
+            <h3 style={{fontWeight:700,fontSize:16,color:G1}}>Application Progress</h3>
+            <div style={{display:'flex',gap:4}}>
+              <div style={{width:5,height:5,borderRadius:99,background:G4}}/>
+              <div style={{width:5,height:5,borderRadius:99,background:G4}}/>
+              <div style={{width:5,height:5,borderRadius:99,background:G4}}/>
+            </div>
+          </div>
+          <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:8}}>
+            <div style={{flex:1}}><ProgressBar pct={pct}/></div>
+            <span style={{fontWeight:700,fontSize:14,color:G1,minWidth:36}}>{pct}%</span>
+          </div>
+          <p style={{fontSize:12,color:G4}}>{applied} out of {Math.max(total,20)} application tasks completed</p>
+        </div>
+
+        {/* Recent applications — directly below progress bar per Figma */}
+        <div style={{background:W,borderRadius:20,padding:'18px 20px',boxShadow:'0 2px 14px rgba(0,0,0,0.07)'}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
+            <h3 style={{fontWeight:700,fontSize:15,color:G1}}>Recent Applications</h3>
+            <span style={{fontSize:12,color:P,fontWeight:600}}>{total} total</span>
+          </div>
+          {applications.length===0?(
+            <div style={{textAlign:'center',padding:'16px 0',color:G4}}>
+              <p style={{fontSize:13}}>No applications yet — explore opportunities to get started</p>
+            </div>
+          ):(
+            applications.slice(0,4).map((app,i,arr)=>(
+              <div key={app.id} style={{display:'flex',alignItems:'center',justifyContent:'space-between',
+                paddingBottom:i<arr.length-1?11:0,marginBottom:i<arr.length-1?11:0,borderBottom:i<arr.length-1?`1px solid ${G6}`:'none'}}>
+                <div style={{flex:1,marginRight:8,minWidth:0}}>
+                  <p style={{fontSize:13,fontWeight:700,color:G1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{app.company}</p>
+                  <p style={{fontSize:11,color:G4,marginTop:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{app.title}</p>
+                </div>
+                <StatusBadge status={app.status}/>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Stat cards */}
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+          <StatTile icon="📋" label="Ongoing" value={inProgress||total} sub="Applications"/>
+          <StatTile icon="📅" label="Upcoming" value={interviews} sub="Interviews"/>
+        </div>
+
+        {/* App Stats */}
+        <div style={{background:W,borderRadius:20,padding:'18px 20px',boxShadow:'0 2px 14px rgba(0,0,0,0.07)'}}>
+          <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:14}}>
+            <span style={{fontSize:16}}>📊</span>
+            <h3 style={{fontWeight:700,fontSize:15,color:G1}}>Application Stats</h3>
+          </div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:0}}>
+            {[
+              {l:'Total Applied',v:total,e:'📁'},
+              {l:'In Progress',v:inProgress,e:'⏳'},
+              {l:'Interviews',v:interviews,e:'🤝'},
+              {l:'Offers',v:offers,e:'✅'},
+              {l:'Rejected',v:rejected,e:'❌'},
+              {l:'Saved',v:savedIds.length,e:'🔖'},
+            ].map(({l,v,e})=>(
+              <div key={l} style={{padding:'10px 8px',borderBottom:`1px solid ${G6}`}}>
+                <div style={{display:'flex',alignItems:'center',gap:5,marginBottom:3}}>
+                  <span style={{fontSize:13}}>{e}</span>
+                  <span style={{fontSize:11,color:G4,fontWeight:500}}>{l}</span>
+                </div>
+                <span style={{fontSize:24,fontWeight:800,color:G1}}>{v}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+const StatTile=({icon,label,value,sub})=>(
+  <div style={{background:P,borderRadius:20,padding:'18px 16px',boxShadow:`0 4px 12px ${P}44`}}>
+    <div style={{width:40,height:40,background:'rgba(255,255,255,0.2)',borderRadius:12,display:'flex',alignItems:'center',justifyContent:'center',marginBottom:12,fontSize:18}}>{icon}</div>
+    <p style={{color:W,fontSize:30,fontWeight:800,lineHeight:1}}>{value}</p>
+    <p style={{color:'rgba(255,255,255,0.7)',fontSize:11,marginTop:5}}>{label}<br/>{sub}</p>
+  </div>
+);
+
+/* ══════════════════════════════════════════
+   APPLICATIONS SCREEN
+══════════════════════════════════════════ */
+function ApplicationsScreen({applications,setApplications,setTab}){
+  const [activeStatus,setActiveStatus]=useState('all');
+  const [selectedApp,setSelectedApp]=useState(null);
+  const [showStatusSheet,setShowStatusSheet]=useState(null);
+
+  const filtered=activeStatus==='all'?applications:applications.filter(a=>a.status===activeStatus);
+  const counts=useMemo(()=>{
+    const c={all:applications.length};
+    STATUS_LIST.forEach(s=>{c[s.key]=applications.filter(a=>a.status===s.key).length;});
+    return c;
+  },[applications]);
+
+  return(
+    <div style={{flex:1,display:'flex',flexDirection:'column',background:BG,overflow:'hidden'}}>
+      <div style={{padding:'8px 20px 10px',flexShrink:0}}>
+        <h1 style={{fontSize:26,fontWeight:800,color:G1}}>Applications</h1>
+        <p style={{fontSize:13,color:G4,marginTop:2}}>{applications.length} total applications</p>
+        <div style={{display:'flex',gap:8,overflowX:'auto',paddingBottom:4,marginTop:10}}>
+          {['all',...STATUS_LIST.map(s=>s.key)].map(s=>{
+            const info=STATUS_LIST.find(x=>x.key===s);
+            return(
+              <button key={s} onClick={()=>setActiveStatus(s)} className="press"
+                style={{padding:'7px 14px',borderRadius:20,border:'none',fontSize:12,fontWeight:700,whiteSpace:'nowrap',
+                  background:activeStatus===s?P:G6,color:activeStatus===s?W:G3,flexShrink:0}}>
+                {s==='all'?'All':info?.label} ({counts[s]||0})
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="scroll-area" style={{padding:'0 16px 16px'}}>
+        {filtered.length===0?(
+          <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'60px 0',textAlign:'center'}}>
+            <span style={{fontSize:52,marginBottom:16}}>📁</span>
+            <p style={{fontWeight:700,fontSize:16,color:G2,marginBottom:8}}>No applications yet</p>
+            <p style={{fontSize:13,color:G4,marginBottom:24}}>Start by exploring opportunities below</p>
+            <button onClick={()=>setTab('explore')} className="press"
+              style={{background:P,color:W,border:'none',borderRadius:12,padding:'12px 24px',fontSize:14,fontWeight:700}}>
+              Explore Jobs
+            </button>
+          </div>
+        ):(
+          <div style={{display:'flex',flexDirection:'column',gap:10,paddingTop:4}}>
+            {filtered.map(app=>(
+              <div key={app.id} style={{background:W,borderRadius:20,padding:'16px',boxShadow:'0 2px 10px rgba(0,0,0,0.06)'}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:8}}>
+                  <div style={{flex:1,marginRight:8}}>
+                    <p style={{fontSize:12,fontWeight:700,color:P,marginBottom:3}}>{app.company}</p>
+                    <h3 style={{fontSize:13,fontWeight:700,color:G1,lineHeight:1.3}}>{app.title}</h3>
+                  </div>
+                  <button onClick={()=>setShowStatusSheet(app.id)} style={{background:'none',border:'none',padding:2,flexShrink:0}}>
+                    <span style={{fontSize:18,color:G4}}>···</span>
+                  </button>
+                </div>
+                <div style={{display:'flex',flexWrap:'wrap',gap:8,marginBottom:10}}>
+                  <div style={{display:'flex',alignItems:'center',gap:4}}><LocationIco/><span style={{fontSize:11,color:G4}}>{app.location}</span></div>
+                  <div style={{display:'flex',alignItems:'center',gap:4}}><ClockIco/><span style={{fontSize:11,color:G4}}>{app.deadline}</span></div>
+                  {app.role&&<div style={{display:'flex',alignItems:'center',gap:4}}><TagIco/><span style={{fontSize:11,color:G4}}>{app.role}</span></div>}
+                </div>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                  <StatusBadge status={app.status}/>
+                  <div style={{display:'flex',gap:8}}>
+                    <span style={{fontSize:11,padding:'4px 9px',borderRadius:20,background:G6,color:G3,fontWeight:600}}>{app.type}</span>
+                    <button onClick={()=>setSelectedApp(app)} className="press"
+                      style={{background:P,color:W,border:'none',borderRadius:10,padding:'6px 12px',fontSize:12,fontWeight:700}}>
+                      View
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Status sheet */}
+      {showStatusSheet&&(
+        <div className="sheet-overlay" onClick={()=>setShowStatusSheet(null)}>
+          <div className="sheet fade-in" onClick={e=>e.stopPropagation()}>
+            <div style={{padding:'20px 20px 0',borderBottom:`1px solid ${G5}`,marginBottom:4}}>
+              <DragHandle/>
+              <p style={{fontWeight:700,fontSize:16,color:G1,marginBottom:2}}>Change Status</p>
+              <p style={{fontSize:13,color:G4,marginBottom:12}}>Choose the current application status</p>
+            </div>
+            {STATUS_LIST.map(s=>(
+              <button key={s.key} onClick={()=>{setApplications(p=>p.map(a=>a.id===showStatusSheet?{...a,status:s.key}:a));setShowStatusSheet(null);}} className="press"
+                style={{width:'100%',display:'flex',alignItems:'center',gap:14,padding:'14px 20px',background:'none',border:'none',borderBottom:`1px solid ${G6}`,textAlign:'left'}}>
+                <div style={{width:36,height:36,borderRadius:12,background:s.bg,display:'flex',alignItems:'center',justifyContent:'center',fontSize:17}}>{s.emoji}</div>
+                <p style={{fontSize:14,fontWeight:600,color:G1}}>{s.label}</p>
+                <ChevR s={16} c={G4} style={{marginLeft:'auto'}}/>
+              </button>
+            ))}
+            <button onClick={()=>setShowStatusSheet(null)} className="press"
+              style={{width:'calc(100% - 32px)',margin:'12px 16px 0',background:G6,border:'none',borderRadius:12,padding:'13px',fontSize:14,fontWeight:600,color:G2}}>
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Detail sheet */}
+      {selectedApp&&(
+        <div className="sheet-overlay" onClick={()=>setSelectedApp(null)}>
+          <div className="sheet fade-in" style={{maxHeight:'80vh',overflowY:'auto'}} onClick={e=>e.stopPropagation()}>
+            <div style={{padding:'20px 20px 0'}}>
+              <DragHandle/>
+              <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:16,paddingBottom:16,borderBottom:`1px solid ${G5}`}}>
+                <div style={{width:46,height:46,background:PL,borderRadius:14,display:'flex',alignItems:'center',justifyContent:'center',fontSize:22,flexShrink:0}}>🏢</div>
+                <div><p style={{fontWeight:700,fontSize:15,color:G1}}>{selectedApp.company}</p><p style={{fontSize:12,color:G4}}>{selectedApp.role}</p></div>
+              </div>
+              <p style={{fontSize:10,fontWeight:700,color:G4,letterSpacing:'0.07em',marginBottom:10}}>OVERVIEW</p>
+              <div style={{background:G6,borderRadius:14,padding:'12px 16px',marginBottom:18}}>
+                {[{l:'Title',v:selectedApp.title},{l:'Company',v:selectedApp.company},{l:'Location',v:selectedApp.location},{l:'Type',v:selectedApp.type},{l:'Deadline',v:selectedApp.deadline},{l:'Role',v:selectedApp.role||selectedApp.sector}].map(({l,v})=>(
+                  <div key={l} style={{display:'flex',justifyContent:'space-between',padding:'7px 0',borderBottom:`1px solid ${G5}`}}>
+                    <span style={{fontSize:12,color:G4}}>{l}</span>
+                    <span style={{fontSize:12,color:G1,fontWeight:600,textAlign:'right',maxWidth:'60%'}}>{v}</span>
+                  </div>
+                ))}
+              </div>
+              <p style={{fontSize:10,fontWeight:700,color:G4,letterSpacing:'0.07em',marginBottom:8}}>NOTES</p>
+              <textarea placeholder="Add notes..." style={{width:'100%',minHeight:80,background:G6,border:'none',borderRadius:12,padding:'11px 13px',fontSize:13,color:G2,resize:'none',outline:'none',marginBottom:16}}/>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:4}}>
+                <button onClick={()=>{setShowStatusSheet(selectedApp.id);setSelectedApp(null);}} className="press"
+                  style={{background:G6,border:'none',borderRadius:12,padding:'13px',fontSize:13,fontWeight:600,color:G2}}>Update Status</button>
+                <button onClick={()=>setSelectedApp(null)} className="press"
+                  style={{background:P,color:W,border:'none',borderRadius:12,padding:'13px',fontSize:13,fontWeight:700}}>Done</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════
+   EXPLORE SCREEN
+══════════════════════════════════════════ */
+function ExploreScreen({savedIds,setSavedIds,applications,setApplications,studyLevel,savedSectors}){
+  const [search,setSearch]=useState('');
+  const [activeRoles,setActiveRoles]=useState([]);
+  const [activeSectors,setActiveSectors]=useState([]);
+  const [page,setPage]=useState(1);
+  const [showFilter,setShowFilter]=useState(false);
+  const [selectedOpp,setSelectedOpp]=useState(null);
+  const PER=3;
+
+  const filtered=useMemo(()=>OPPORTUNITIES.filter(o=>{
+    const q=search.toLowerCase();
+    const mQ=!q||o.title.toLowerCase().includes(q)||o.company.toLowerCase().includes(q)||o.location.toLowerCase().includes(q)||o.role.toLowerCase().includes(q);
+    const mR=activeRoles.length===0||activeRoles.includes(o.role);
+    const mS=activeSectors.length===0||activeSectors.some(s=>o.sector.includes(s));
+    return mQ&&mR&&mS;
+  }),[search,activeRoles,activeSectors]);
+
+  const pages=Math.ceil(filtered.length/PER);
+  const paginated=filtered.slice((page-1)*PER,page*PER);
+  const toggleSave=id=>setSavedIds(p=>p.includes(id)?p.filter(x=>x!==id):[...p,id]);
+  const apply=opp=>{
+    if(!applications.find(a=>a.id===opp.id))setApplications(p=>[...p,{...opp,status:'applied',appliedDate:new Date().toLocaleDateString()}]);
+    setSelectedOpp(null);
+  };
+
+  const anyFilter=activeRoles.length>0||activeSectors.length>0;
+
+  return(
+    <div style={{flex:1,display:'flex',flexDirection:'column',background:BG,overflow:'hidden'}}>
+      <div style={{padding:'8px 20px 10px',flexShrink:0}}>
+        <h1 style={{fontSize:26,fontWeight:800,color:G1}}>Explore</h1>
+        <p style={{fontSize:13,color:G4,marginTop:2,marginBottom:12}}>Opportunities · {filtered.length} roles found</p>
+        <SearchInput placeholder="Search roles, companies, locations…" value={search} onChange={e=>{setSearch(e.target.value);setPage(1);}}/>
+        <div style={{display:'flex',gap:8,marginTop:10,overflowX:'auto',paddingBottom:2}}>
+          <button onClick={()=>setShowFilter(true)} className="press"
+            style={{display:'flex',alignItems:'center',gap:6,padding:'7px 13px',borderRadius:20,
+              border:`1.5px solid ${anyFilter?P:G5}`,background:anyFilter?PL:W,
+              fontSize:13,fontWeight:600,color:anyFilter?P:G2,flexShrink:0}}>
+            <FilterIco s={13} c={anyFilter?P:G3}/> Filter {anyFilter?`(${activeRoles.length+activeSectors.length})`:''} <ChevD s={13} c={anyFilter?P:G3}/>
+          </button>
+          {ROLE_FILTERS.slice(0,4).map(r=>(
+            <Chip key={r} label={r} active={activeRoles.includes(r)} small
+              onClick={()=>{setActiveRoles(p=>p.includes(r)?p.filter(x=>x!==r):[...p,r]);setPage(1);}}/>
+          ))}
+        </div>
+        {anyFilter&&(
+          <button onClick={()=>{setActiveRoles([]);setActiveSectors([]);}} style={{background:'none',border:'none',color:P,fontSize:12,fontWeight:600,marginTop:6,padding:0}}>
+            Clear all filters ×
+          </button>
+        )}
+      </div>
+
+      <div className="scroll-area" style={{padding:'0 16px 8px'}}>
+        <div style={{display:'flex',flexDirection:'column',gap:10,paddingBottom:8}}>
+          {paginated.map(opp=>{
+            const isApplied=applications.some(a=>a.id===opp.id);
+            return(
+              <div key={opp.id} style={{background:W,borderRadius:20,padding:'16px',boxShadow:'0 2px 10px rgba(0,0,0,0.06)'}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:8}}>
+                  <div style={{flex:1,marginRight:8}}>
+                    <p style={{fontSize:12,fontWeight:700,color:P,marginBottom:3}}>{opp.company}</p>
+                    <h3 style={{fontSize:14,fontWeight:700,color:G1,lineHeight:1.3}}>{opp.title}</h3>
+                  </div>
+                  <button onClick={()=>toggleSave(opp.id)} className="press" style={{background:'none',border:'none',padding:4,flexShrink:0}}>
+                    <BookmarkIco filled={savedIds.includes(opp.id)} s={22}/>
+                  </button>
+                </div>
+                <div style={{display:'flex',flexWrap:'wrap',gap:8,marginBottom:12}}>
+                  <div style={{display:'flex',alignItems:'center',gap:4}}><LocationIco s={12}/><span style={{fontSize:12,color:G4}}>{opp.location}</span></div>
+                  <div style={{display:'flex',alignItems:'center',gap:4}}><span style={{fontSize:11}}>🎓</span><span style={{fontSize:12,color:G4}}>{opp.type}</span></div>
+                  <div style={{display:'flex',alignItems:'center',gap:4}}><TagIco s={12}/><span style={{fontSize:12,color:G4}}>{opp.role}</span></div>
+                </div>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                  <div style={{display:'flex',alignItems:'center',gap:4}}><ClockIco s={12}/><span style={{fontSize:12,color:G4}}>{opp.deadline}</span></div>
+                  {isApplied?(
+                    <span style={{fontSize:12,fontWeight:700,padding:'7px 14px',borderRadius:12,background:'#dcfce7',color:'#15803d'}}>Applied ✓</span>
+                  ):(
+                    <button onClick={()=>setSelectedOpp(opp)} className="press"
+                      style={{display:'flex',alignItems:'center',gap:5,background:P,color:W,border:'none',
+                        borderRadius:12,padding:'8px 16px',fontSize:12,fontWeight:700,boxShadow:`0 3px 10px ${P}44`}}>
+                      Apply <ArrowUp s={14} c={W}/>
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Pagination */}
+        {pages>1&&(
+          <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:6,padding:'8px 0 12px'}}>
+            <div style={{display:'flex',alignItems:'center',gap:6}}>
+              <button onClick={()=>setPage(p=>Math.max(1,p-1))} disabled={page===1} className="press"
+                style={{display:'flex',alignItems:'center',gap:3,padding:'7px 12px',borderRadius:10,
+                  border:`1.5px solid ${G5}`,background:W,fontSize:13,fontWeight:600,color:page===1?G5:G2}}>
+                <ChevL s={14}/> Prev
+              </button>
+              {Array.from({length:Math.min(6,pages)},(_,i)=>(
+                <button key={i+1} onClick={()=>setPage(i+1)} className="press"
+                  style={{width:30,height:30,borderRadius:8,border:'none',fontSize:12,fontWeight:700,
+                    background:page===i+1?P:G6,color:page===i+1?W:G3}}>
+                  {i+1}
+                </button>
+              ))}
+              {pages>6&&<span style={{color:G4,fontSize:12}}>…{pages}</span>}
+              <button onClick={()=>setPage(p=>Math.min(pages,p+1))} disabled={page===pages} className="press"
+                style={{display:'flex',alignItems:'center',gap:3,padding:'7px 12px',borderRadius:10,
+                  border:`1.5px solid ${G5}`,background:W,fontSize:13,fontWeight:600,color:page===pages?G5:G2}}>
+                Next <ChevR s={14}/>
+              </button>
+            </div>
+            <p style={{fontSize:11,color:G4}}>Page {page} of {pages} · {filtered.length} results</p>
+          </div>
+        )}
+      </div>
+
+      {/* Filter sheet */}
+      {showFilter&&(
+        <div className="sheet-overlay" onClick={()=>setShowFilter(false)}>
+          <div className="sheet fade-in" style={{maxHeight:'80vh',overflowY:'auto'}} onClick={e=>e.stopPropagation()}>
+            <div style={{padding:'20px 20px 0'}}>
+              <DragHandle/>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
+                <h3 style={{fontWeight:800,fontSize:17,color:G1}}>Filter Opportunities</h3>
+                <button onClick={()=>{setActiveRoles([]);setActiveSectors([]);}} style={{background:'none',border:'none',color:P,fontSize:13,fontWeight:600}}>Clear All</button>
+              </div>
+              <p style={{fontSize:11,fontWeight:700,color:G4,letterSpacing:'0.07em',marginBottom:10}}>ROLE TYPE</p>
+              <div style={{display:'flex',flexWrap:'wrap',gap:8,marginBottom:20}}>
+                {ROLE_FILTERS.map(r=>(
+                  <Chip key={r} label={r} active={activeRoles.includes(r)} small
+                    onClick={()=>setActiveRoles(p=>p.includes(r)?p.filter(x=>x!==r):[...p,r])}/>
+                ))}
+              </div>
+              <p style={{fontSize:11,fontWeight:700,color:G4,letterSpacing:'0.07em',marginBottom:10}}>SECTOR</p>
+              <div style={{display:'flex',flexWrap:'wrap',gap:8,marginBottom:24}}>
+                {['Finance','Healthcare & Life Sciences'].map(s=>(
+                  <Chip key={s} label={s} active={activeSectors.includes(s)} small
+                    onClick={()=>setActiveSectors(p=>p.includes(s)?p.filter(x=>x!==s):[...p,s])}/>
+                ))}
+              </div>
+              <button onClick={()=>setShowFilter(false)} className="press"
+                style={{width:'100%',background:P,color:W,border:'none',borderRadius:14,padding:'14px',fontSize:15,fontWeight:700,marginBottom:4}}>
+                Apply Filters
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Apply sheet */}
+      {selectedOpp&&(
+        <div className="sheet-overlay" onClick={()=>setSelectedOpp(null)}>
+          <div className="sheet fade-in" onClick={e=>e.stopPropagation()}>
+            <div style={{padding:'20px 20px 0'}}>
+              <DragHandle/>
+              <div style={{display:'flex',alignItems:'center',gap:12,paddingBottom:14,borderBottom:`1px solid ${G5}`,marginBottom:14}}>
+                <div style={{width:44,height:44,background:PL,borderRadius:14,display:'flex',alignItems:'center',justifyContent:'center',fontSize:20,flexShrink:0}}>🏢</div>
+                <div>
+                  <p style={{fontWeight:700,fontSize:15,color:G1}}>{selectedOpp.company}</p>
+                  <p style={{fontSize:13,color:G3}}>{selectedOpp.role} · {selectedOpp.type}</p>
+                </div>
+              </div>
+              <div style={{background:G6,borderRadius:14,padding:'12px 14px',marginBottom:14}}>
+                {[{l:'Role',v:selectedOpp.title},{l:'Location',v:selectedOpp.location},{l:'Deadline',v:selectedOpp.deadline},{l:'Sector',v:selectedOpp.sector}].map(({l,v})=>(
+                  <div key={l} style={{display:'flex',justifyContent:'space-between',padding:'6px 0',borderBottom:`1px solid ${G5}`}}>
+                    <span style={{fontSize:12,color:G4}}>{l}</span><span style={{fontSize:12,color:G1,fontWeight:600}}>{v}</span>
+                  </div>
+                ))}
+              </div>
+              <textarea placeholder="Add notes before applying..." style={{width:'100%',minHeight:68,background:G6,border:'none',borderRadius:12,padding:'10px 12px',fontSize:13,color:G2,resize:'none',outline:'none',marginBottom:14}}/>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:4}}>
+                <button onClick={()=>setSelectedOpp(null)} className="press" style={{background:G6,border:'none',borderRadius:12,padding:'13px',fontSize:14,fontWeight:600,color:G2}}>Cancel</button>
+                <button onClick={()=>apply(selectedOpp)} className="press" style={{background:P,color:W,border:'none',borderRadius:12,padding:'13px',fontSize:14,fontWeight:700}}>Apply Now</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════
+   CALENDAR SCREEN
+══════════════════════════════════════════ */
+const DAYS_S=['Mo','Tu','We','Th','Fr','Sa','Su'];
+const MONTHS_L=['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+function CalendarScreen({applications}){
+  const today=new Date();
+  const [vd,setVd]=useState({y:today.getFullYear(),m:today.getMonth()});
+  const [sel,setSel]=useState(today.getDate());
+  const [events,setEvents]=useState(CALENDAR_EVENTS);
+
+  const dim=new Date(vd.y,vd.m+1,0).getDate();
+  const fdow=(new Date(vd.y,vd.m,1).getDay()+6)%7;
+  const selStr=`${MONTHS_L[vd.m].slice(0,3)} ${sel}`;
+  const dayEvs=events.filter(e=>e.date===selStr);
+
+  return(
+    <div style={{flex:1,display:'flex',flexDirection:'column',background:BG,overflow:'hidden'}}>
+      <div style={{padding:'8px 20px 0',flexShrink:0}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
+          <h1 style={{fontSize:26,fontWeight:800,color:G1}}>Calendar</h1>
+          <button className="press" style={{display:'flex',alignItems:'center',gap:5,padding:'8px 14px',borderRadius:12,background:P,border:'none',color:W,fontSize:13,fontWeight:700}}>
+            <Plus s={14}/> Add
+          </button>
+        </div>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+          <button onClick={()=>setVd(v=>v.m===0?{y:v.y-1,m:11}:{...v,m:v.m-1})} className="press" style={{background:G6,border:'none',borderRadius:10,padding:'7px 10px',display:'flex'}}><ChevL s={16}/></button>
+          <span style={{fontWeight:700,fontSize:15,color:G1}}>{MONTHS_L[vd.m]} {vd.y}</span>
+          <button onClick={()=>setVd(v=>v.m===11?{y:v.y+1,m:0}:{...v,m:v.m+1})} className="press" style={{background:G6,border:'none',borderRadius:10,padding:'7px 10px',display:'flex'}}><ChevR s={16}/></button>
+        </div>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',marginBottom:4}}>
+          {DAYS_S.map(d=><div key={d} style={{textAlign:'center',fontSize:11,fontWeight:700,color:G4,padding:'4px 0'}}>{d}</div>)}
+        </div>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:2,marginBottom:14}}>
+          {Array.from({length:fdow},(_,i)=><div key={`e${i}`}/>)}
+          {Array.from({length:dim},(_,i)=>{
+            const day=i+1;
+            const isToday=day===today.getDate()&&vd.m===today.getMonth()&&vd.y===today.getFullYear();
+            const isSel=day===sel;
+            const ds=`${MONTHS_L[vd.m].slice(0,3)} ${day}`;
+            const hasEv=events.some(e=>e.date===ds);
+            return(
+              <button key={day} onClick={()=>setSel(day)} className="press"
+                style={{aspectRatio:'1',borderRadius:10,border:'none',fontSize:13,fontWeight:isSel||isToday?700:500,
+                  background:isSel?P:isToday?PL:'transparent',color:isSel?W:isToday?P:G2,
+                  display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:2}}>
+                {day}
+                {hasEv&&<div style={{width:4,height:4,borderRadius:99,background:isSel?'rgba(255,255,255,0.7)':P}}/>}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="scroll-area" style={{padding:'0 16px 16px'}}>
+        <p style={{fontSize:12,fontWeight:700,color:G4,marginBottom:8}}>{selStr} · {dayEvs.length} events</p>
+        {dayEvs.length===0?(
+          <div style={{textAlign:'center',padding:'24px 0',color:G4}}>
+            <span style={{fontSize:32,display:'block',marginBottom:6}}>📅</span>
+            <p style={{fontSize:13}}>No events on this day</p>
+          </div>
+        ):(
+          <div style={{display:'flex',flexDirection:'column',gap:10}}>
+            {dayEvs.map(ev=>(
+              <div key={ev.id} style={{background:ev.color||G6,borderRadius:18,padding:'14px 16px',display:'flex',alignItems:'center',gap:12}}>
+                <div style={{width:44,height:44,background:'rgba(255,255,255,0.7)',borderRadius:12,display:'flex',alignItems:'center',justifyContent:'center',fontSize:18,flexShrink:0}}>🏢</div>
+                <div>
+                  <p style={{fontSize:12,color:G4,marginBottom:1}}>{ev.company}</p>
+                  <p style={{fontWeight:700,fontSize:16,color:G1}}>{ev.title}</p>
+                  <p style={{fontSize:12,color:G3,marginTop:2}}>{ev.time}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        {applications.length>0&&(
+          <>
+            <p style={{fontSize:12,fontWeight:700,color:G4,marginTop:18,marginBottom:8}}>Upcoming Deadlines</p>
+            {applications.slice(0,3).map(app=>(
+              <div key={app.id} style={{background:W,borderRadius:14,padding:'11px 14px',display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8,boxShadow:'0 1px 6px rgba(0,0,0,0.05)'}}>
+                <div>
+                  <p style={{fontSize:13,fontWeight:700,color:G1}}>{app.company}</p>
+                  <p style={{fontSize:11,color:G4}}>{app.title.slice(0,32)}{app.title.length>32?'…':''}</p>
+                </div>
+                <span style={{fontSize:11,fontWeight:600,color:P,background:PL,padding:'4px 10px',borderRadius:20}}>{app.deadline}</span>
+              </div>
+            ))}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════
+   NEWS SCREEN
+══════════════════════════════════════════ */
+function NewsScreen({savedSectors}){
+  const [search,setSearch]=useState('');
+  const [activeSector,setActiveSector]=useState(null);
+  const [selectedArticle,setSelectedArticle]=useState(null);
+
+  const NEWS_SECTORS=['All','Healthcare','Technology','Finance','Regulatory','Careers'];
+
+  const filtered=NEWS_ARTICLES.filter(a=>{
+    const q=search.toLowerCase();
+    const mQ=!q||a.title.toLowerCase().includes(q)||a.summary.toLowerCase().includes(q)||a.company.toLowerCase().includes(q);
+    const mS=!activeSector||activeSector==='All'||a.sector===activeSector;
+    return mQ&&mS;
+  });
+
+  const grads=[
+    'linear-gradient(135deg,#1a2744 0%,#1e1b4b 100%)',
+    'linear-gradient(135deg,#064e3b 0%,#065f46 100%)',
+    'linear-gradient(135deg,#1c1917 0%,#292524 100%)',
+    'linear-gradient(135deg,#4a1942 0%,#6b21a8 100%)',
+    'linear-gradient(135deg,#0c4a6e 0%,#0e7490 100%)',
+    'linear-gradient(135deg,#3b1f0a 0%,#78350f 100%)',
+    'linear-gradient(135deg,#14532d 0%,#166534 100%)',
+    'linear-gradient(135deg,#1e1b4b 0%,#312e81 100%)',
+    'linear-gradient(135deg,#4c0519 0%,#9f1239 100%)',
+    'linear-gradient(135deg,#0f172a 0%,#1e293b 100%)',
+    'linear-gradient(135deg,#1a1a2e 0%,#16213e 100%)',
+    'linear-gradient(135deg,#0d3024 0%,#064e3b 100%)',
+  ];
+
+  const sectorColor={Healthcare:'#10b981',Technology:'#3b82f6',Finance:'#f59e0b',Regulatory:'#8b5cf6',Careers:'#ec4899'};
+
+  return(
+    <div style={{flex:1,display:'flex',flexDirection:'column',background:BG,overflow:'hidden'}}>
+      <div style={{padding:'8px 20px 10px',flexShrink:0}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+          <div>
+            <h1 style={{fontSize:26,fontWeight:800,color:G1}}>Industry News</h1>
+            <p style={{fontSize:13,color:G4,marginTop:2}}>{filtered.length} articles</p>
+          </div>
+        </div>
+        <SearchInput placeholder="Search articles, companies, topics…" value={search} onChange={e=>setSearch(e.target.value)}/>
+        <div style={{display:'flex',gap:8,marginTop:10,overflowX:'auto',paddingBottom:2}}>
+          {NEWS_SECTORS.map(s=>(
+            <Chip key={s} label={s} active={activeSector===s||(s==='All'&&!activeSector)} small
+              onClick={()=>setActiveSector(s==='All'?null:s)}/>
+          ))}
+        </div>
+      </div>
+
+      <div className="scroll-area" style={{padding:'0 16px 16px'}}>
+        <div style={{display:'flex',flexDirection:'column',gap:12}}>
+          {filtered.map((article,i)=>(
+            <button key={article.id} onClick={()=>setSelectedArticle(article)} className="press"
+              style={{background:W,borderRadius:20,overflow:'hidden',boxShadow:'0 2px 10px rgba(0,0,0,0.06)',border:'none',textAlign:'left',width:'100%'}}>
+              <div style={{height:140,background:grads[i%grads.length],position:'relative',overflow:'hidden',display:'flex',alignItems:'flex-end',padding:'0 16px 14px'}}>
+                <div style={{position:'absolute',top:12,right:14}}>
+                  <span style={{fontSize:10,fontWeight:700,padding:'4px 10px',borderRadius:20,
+                    background:sectorColor[article.sector]||P,color:W,letterSpacing:'0.05em'}}>
+                    {article.sector.toUpperCase()}
+                  </span>
+                </div>
+                <div style={{display:'flex',alignItems:'center',gap:8}}>
+                  <div style={{width:28,height:28,background:'rgba(255,255,255,0.15)',borderRadius:8,display:'flex',alignItems:'center',justifyContent:'center',fontSize:14}}>🏢</div>
+                  <span style={{fontSize:12,fontWeight:700,color:'rgba(255,255,255,0.85)'}}>{article.company}</span>
+                </div>
+              </div>
+              <div style={{padding:'12px 16px 14px'}}>
+                <h3 style={{fontSize:14,fontWeight:700,color:G1,lineHeight:1.4,marginBottom:6}}>{article.title}</h3>
+                <p style={{fontSize:12,color:G3,lineHeight:1.5,marginBottom:10,display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden'}}>{article.summary}</p>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                  <span style={{fontSize:11,fontWeight:600,color:G3}}>{article.source}</span>
+                  <div style={{display:'flex',alignItems:'center',gap:4}}>
+                    <ClockIco s={12}/><span style={{fontSize:11,color:G4}}>{article.time}</span>
+                  </div>
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Article detail */}
+      {selectedArticle&&(
+        <div className="sheet-overlay" onClick={()=>setSelectedArticle(null)}>
+          <div className="sheet fade-in" style={{maxHeight:'88vh',overflowY:'auto'}} onClick={e=>e.stopPropagation()}>
+            <div style={{padding:'20px 20px 0'}}>
+              <DragHandle/>
+              <div style={{background:grads[NEWS_ARTICLES.indexOf(selectedArticle)%grads.length],borderRadius:18,padding:'20px',marginBottom:18,position:'relative',overflow:'hidden'}}>
+                <span style={{position:'absolute',top:12,right:14,fontSize:10,fontWeight:700,padding:'4px 10px',borderRadius:20,background:sectorColor[selectedArticle.sector]||P,color:W,letterSpacing:'0.05em'}}>{selectedArticle.sector.toUpperCase()}</span>
+                <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10}}>
+                  <span style={{fontSize:12,fontWeight:700,color:'rgba(255,255,255,0.8)'}}>{selectedArticle.company}</span>
+                </div>
+                <h2 style={{fontSize:18,fontWeight:800,color:W,lineHeight:1.3}}>{selectedArticle.title}</h2>
+              </div>
+              <p style={{fontSize:14,color:G2,lineHeight:1.7,marginBottom:14}}>{selectedArticle.summary} Further details are expected to be released in official communications over the coming weeks, with analysts paying close attention to the broader implications for the sector.</p>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'12px 0',borderTop:`1px solid ${G5}`,marginBottom:16}}>
+                <span style={{fontSize:13,fontWeight:600,color:G2}}>{selectedArticle.source}</span>
+                <span style={{fontSize:12,color:G4}}>{selectedArticle.time}</span>
+              </div>
+              <button onClick={()=>setSelectedArticle(null)} className="press"
+                style={{width:'100%',background:G6,border:'none',borderRadius:12,padding:'14px',fontSize:14,fontWeight:600,color:G2}}>
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════
+   MAIN APP
+══════════════════════════════════════════ */
+function App(){
+  // flow: login | onboard1 | onboard2 | onboard3_study | onboard4_sectors | app
+  const [flow,setFlow]=useState('login');
+  const [userName,setUserName]=useState('Sarah');
+  const [studyLevel,setStudyLevel]=useState('undergrad');
+  const [savedSectors,setSavedSectors]=useState([]);
+  const [tab,setTab]=useState('dashboard');
+  const [applications,setApplications]=useState([]);
+  const [savedIds,setSavedIds]=useState([]);
+  const [showNotifs,setShowNotifs]=useState(false);
+  const [showProfile,setShowProfile]=useState(false);
+
+  const isWide=window.innerWidth>440;
+
+  const screens={
+    dashboard:<DashboardScreen userName={userName} applications={applications} savedIds={savedIds}
+      studyLevel={studyLevel} savedSectors={savedSectors}
+      onBell={()=>{setShowNotifs(v=>!v);setShowProfile(false);}}
+      onProfile={()=>{setShowProfile(true);setShowNotifs(false);}}/>,
+    applications:<ApplicationsScreen applications={applications} setApplications={setApplications} setTab={setTab}/>,
+    explore:<ExploreScreen savedIds={savedIds} setSavedIds={setSavedIds} applications={applications}
+      setApplications={setApplications} studyLevel={studyLevel} savedSectors={savedSectors}/>,
+    calendar:<CalendarScreen applications={applications}/>,
+    news:<NewsScreen savedSectors={savedSectors}/>,
+  };
+
+  return(
+    <div style={{minHeight:'100vh',background:'#ddd8f5',display:'flex',alignItems:'center',justifyContent:'center',padding:8}}>
+      <div style={{width:'100%',maxWidth:430,background:BG,display:'flex',flexDirection:'column',
+        height:'min(900px,100vh)',position:'relative',overflow:'hidden',
+        borderRadius:isWide?44:0,boxShadow:isWide?'0 32px 80px rgba(0,0,0,0.22)':'none'}}>
+
+        <StatusBar/>
+
+        {/* ── ONBOARDING FLOWS ── */}
+        {flow==='login'&&(
+          <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
+            <LoginScreen onLogin={e=>{
+              const n=e.split('@')[0].replace(/[^a-zA-Z]/g,' ').split(' ')[0];
+              setUserName(n.charAt(0).toUpperCase()+n.slice(1));
+              setFlow('onboard1');
+            }}/>
+          </div>
+        )}
+        {flow==='onboard1'&&(
+          <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
+            <OnboardingWelcome onStart={()=>setFlow('onboard2')}/>
+          </div>
+        )}
+        {flow==='onboard2'&&(
+          <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
+            <OnboardingName onNext={n=>{setUserName(n);setFlow('onboard3_study');}}/>
+          </div>
+        )}
+        {flow==='onboard3_study'&&(
+          <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
+            <OnboardingStudyLevel onNext={s=>{setStudyLevel(s);setFlow('onboard4_sectors');}}/>
+          </div>
+        )}
+        {flow==='onboard4_sectors'&&(
+          <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
+            <OnboardingSectors onNext={s=>{setSavedSectors(s);setFlow('app');}}/>
+          </div>
+        )}
+
+        {/* ── MAIN APP ── */}
+        {flow==='app'&&(
+          <>
+            {/* Notification panel overlay (below header) */}
+            {showNotifs&&(
+              <div style={{position:'absolute',top:50,left:0,right:0,zIndex:150}}>
+                <NotificationsPanel onClose={()=>setShowNotifs(false)} savedSectors={savedSectors} studyLevel={studyLevel}/>
+              </div>
+            )}
+
+            {/* Dismiss overlay for notifs */}
+            {showNotifs&&(
+              <div onClick={()=>setShowNotifs(false)}
+                style={{position:'absolute',inset:0,zIndex:140,background:'rgba(0,0,0,0.2)'}}/>
+            )}
+
+            {/* Profile sheet */}
+            {showProfile&&(
+              <ProfilePanel
+                onClose={()=>setShowProfile(false)}
+                userName={userName}
+                studyLevel={studyLevel}
+                setStudyLevel={setStudyLevel}
+                savedSectors={savedSectors}
+                setSavedSectors={setSavedSectors}
+                onLogout={()=>{setShowProfile(false);setFlow('login');setApplications([]);setSavedIds([]);}}
+              />
+            )}
+
+            <div key={tab} style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden',position:'relative'}}>
+              {screens[tab]}
+            </div>
+            <NavBar tab={tab} setTab={t=>{setTab(t);setShowNotifs(false);}}/>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.render(<App/>,document.getElementById('root'));
+</script>
+</body>
+</html>
